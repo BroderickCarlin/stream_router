@@ -1,0 +1,11 @@
+[package]
+name = "stream_router"
+version = "0.0.1"
+authors = ["Broderick Carlin <broderick.carlin@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+futures = "0.3"
+
+[dev-dependencies]
+tokio = {version = "0.2", features = ["full"]}
