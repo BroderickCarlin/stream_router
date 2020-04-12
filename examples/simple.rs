@@ -44,6 +44,7 @@ impl Stream for NumStream {
     }
 }
 
+// This is the enum we will use to tag our sinks
 #[derive(Hash, PartialEq, Eq)]
 enum NumType {
     A,
