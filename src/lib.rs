@@ -1,11 +1,10 @@
 use futures::future::Future;
-use futures::sink::Sink;
+use futures::sink::{Sink, SinkExt};
 use futures::stream::Stream;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-// use crate::{rand, tagger};
 
 mod rand;
 mod tagger;
@@ -63,19 +62,24 @@ where
         }
     }
 
-    pub fn add_source(
+    pub fn add_source<S, M>(
         &mut self,
-        stream: Box<dyn Stream<Item = A> + Unpin>,
-        transform: Box<dyn Fn(A) -> F>,
+        stream: S,
+        transform: M,
     ) where
+        S: Stream<Item = A> + Unpin + 'static,
+        M: Fn(A) -> F + 'static,
         F: Future<Output = T>,
     {
-        let tagger = tagger::StreamTagger::new(transform);
-        self.streams.push(StreamManager::new(tagger, stream));
+        let tagger = tagger::StreamTagger::new(Box::new(transform));
+        self.streams.push(StreamManager::new(tagger, Box::new(stream)));
     }
 
-    pub fn add_sink(&mut self, sink: Box<dyn Sink<A, Error = ()> + Unpin>, tag: T) {
-        self.sinks.insert(tag, (0, sink));
+    pub fn add_sink<S>(&mut self, sink: S, tag: T)
+    where 
+        S: Sink<A> + Unpin + Sized + 'static,
+    {
+        self.sinks.insert(tag, (0, Box::new(sink.sink_map_err(|_| ()))));
     }
 }
 
