@@ -12,4 +12,6 @@ futures = "0.3"
 
 [dev-dependencies]
 tokio = {version = "0.2", features = ["full"]}
+futures = {version = "0.3", features = ["compat"]}
 num_stream = "0.1"
+qutex = "0.2"
