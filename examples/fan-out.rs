@@ -10,6 +10,8 @@ struct State {
     last_output: u64,
 }
 
+// This is a basic state-ful example that will take an input stream and sequentially fan out the
+// yielded values to a set of Sinks
 #[tokio::main]
 async fn main() {
     let mut router = stream_router::StreamRouter::new();
@@ -47,6 +49,14 @@ async fn main() {
 
     router.add_source(nums, fan);
 
+    // Expected Output:
+    // 1: 0
+    // 2: 1
+    // 3: 2
+    // 4: 3
+    // 0: 4
+    // 1: 5
+    // 2: 6
     loop {
         tokio::select! {
             _ = router.next() => {

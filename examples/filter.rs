@@ -4,6 +4,8 @@ use std::time::Duration;
 use stream_router;
 use tokio;
 
+// This is a simple example showing how a filter can be easily created to remove
+// all odd values from a Stream
 #[tokio::main]
 async fn main() {
     let mut router = stream_router::StreamRouter::new();
@@ -18,6 +20,12 @@ async fn main() {
     router.add_source(nums, is_even);
     router.add_sink(black_hole, false);
 
+    // Expected Output:
+    // Val: 0
+    // Val: 2
+    // Val: 4
+    // Val: 6
+    // ...
     loop {
         let val = router.next().await;
         println!("Val: {:?}", val.unwrap());

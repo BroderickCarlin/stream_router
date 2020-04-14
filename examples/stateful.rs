@@ -10,6 +10,8 @@ struct State {
     output: bool,
 }
 
+// This is a basic state-ful example that will take an input stream and alternate between yielding
+// 10 sequential values and dropping 10 sequential values.
 #[tokio::main]
 async fn main() {
     let mut router = stream_router::StreamRouter::new();
@@ -40,6 +42,15 @@ async fn main() {
     router.add_source(nums, is_enabled);
     router.add_sink(black_hole, false);
 
+    // Expected Output:
+    // Val: 10
+    // Val: 11
+    // ...
+    // Val: 19
+    // Val: 30
+    // Val: 31
+    // Val: 32
+    // ...
     loop {
         let val = router.next().await;
         println!("Val: {:?}", val.unwrap());
