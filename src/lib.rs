@@ -40,10 +40,81 @@ impl<F, A, T> StreamManager<F, A, T> {
     }
 }
 
+/// The core Struct of this crate that is capable of dynamically routing values between
+/// [`Stream`s](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html) and [`Sink`s](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html).
+///
+/// A `StreamRouter` is at it's core a [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html)
+/// that can take ownership of any number of other [`Stream`s](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html)
+/// and any number of [`Sink`s](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html) and dynamically route
+/// values yielded from the [`Stream`s](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html) to any one of the
+/// provided [`Sink`s](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html) through user-defined routing rules. 
+/// 
+/// Each [`Sink`](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html) provided to the `StreamRouter` 
+/// is tagged with a user-defined [`Hash`able](https://doc.rust-lang.org/std/hash/trait.Hash.html) value.
+/// This tag is utilized by the router to identify and differentiate [`Sink`s](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html)
+/// and is what the user will utilize to reference a specific [`Sink`](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html)
+/// when defining the routing logic.
+/// 
+/// Each [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html) is provided with a matching closure
+/// that consumes the values yielded by the accompanying [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html)
+/// and returns a [`Future`](https://docs.rs/futures/0.3.4/futures/prelude/trait.Future.html) that will resolve to one of the tags
+/// identifying a specific [`Sink`](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html) that the yielded value will be
+/// forwarded to. If no [`Sink`](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html) is found for the returned routing tag
+/// the value will be yielded from the `StreamRouter` itself. 
+/// 
+/// The `StreamRouter` makes the guarantee that order will be preserved for values yielded from [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html)
+/// "A" and sent to [`Sink`](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html) "B" such that "A" will not attempt to sink any values into "B" until all
+/// previous values from "A" sent to "B" have been processed. There are no cross-Stream or cross-Sink timing or ordering guarentees. 
+///
+/// # Example
+/// 
+/// The following example is [`simple.rs`](https://github.com/BroderickCarlin/stream_router/blob/master/examples/simple.rs)
+/// from the [examples](https://github.com/BroderickCarlin/stream_router/tree/master/examples) folder. This simple example
+/// illustrates the `StreamRouter` forwarding all even values to the `even_chan_tx` while all odd numbers are yielded by
+/// the `StreamRouter` itself. A user could decide to provide a second [`Sink`](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html)
+/// to explicitly consume odd values if desired, in which case the `StreamRouter` would never yield any values itself.
+/// 
+///
+/// ```
+/// use futures::{channel::mpsc, future, stream, stream::StreamExt};
+/// use stream_router;
+/// use tokio;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     let mut router = stream_router::StreamRouter::new();
+///     let nums = stream::iter(0..1_000);
+///     let (even_chan_tx, mut even_chan_rx) = mpsc::channel(10);
+///
+///     router.add_source(nums, |x| future::lazy(move |_| x % 2 == 0));
+///     router.add_sink(even_chan_tx, true);
+///
+///     loop {
+///         tokio::select! {
+///             v = router.next() => {
+///                 println!("odd number:  {:?}", v.unwrap());
+///             }
+///             v = even_chan_rx.next() => {
+///                 println!("even number: {:?}", v.unwrap());
+///             }
+///         }
+///     }
+/// }
+/// ```
+/// 
+/// # Routing Logic
+/// 
+/// The `StreamRouter`'s routing logic is provided by the user in the form of closures that can map values yielded by
+/// a specific [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html) into tags that identify
+/// specific [`Sink`s](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html). These closures follow the form of
+/// `Fn(A) -> Future<Output=T>` where `A` is a value yielded by the [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html) 
+/// and where `T` is a tag that the user has assigned to one of their [`Sink`s](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html). 
+/// While simple routing (such as shown above) has no real need to utilize the flexibility provided by returning a
+/// [`Future`](https://docs.rs/futures/0.3.4/futures/prelude/trait.Future.html), the option to return a 
+/// [`Future`](https://docs.rs/futures/0.3.4/futures/prelude/trait.Future.html) allows for more complex state-ful routing. 
+/// An example of utilizing state-ful routing to dedup an incoming [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html)
+/// can be found in the [`dedup.rs`](https://github.com/BroderickCarlin/stream_router/blob/master/examples/dedup.rs) example. 
 pub struct StreamRouter<F, T, A>
-// F - The future generated by M that will yield the tag
-// T - The tag
-// A - The type that is routed through the router
 where
     T: Hash + Eq,
 {
@@ -55,6 +126,7 @@ impl<F, T, A> StreamRouter<F, T, A>
 where
     T: Hash + Eq,
 {
+    /// Creates a new instance of a `StreamRouter`
     pub fn new() -> StreamRouter<F, T, A> {
         StreamRouter {
             streams: vec![],
@@ -62,24 +134,67 @@ where
         }
     }
 
-    pub fn add_source<S, M>(
-        &mut self,
-        stream: S,
-        transform: M,
-    ) where
+    /// Adds a new [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html) to 
+    /// the `StreamRouter` and provides the routing function that will be utilized to assign a 
+    /// tag to each value yielded by the [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html).
+    /// This tag will determine which [`Sink`](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html), if any, the 
+    /// value will be forwarded to.
+    /// 
+    /// The routing function follows the form: `Fn(A) -> Future<Output=T>` where `A` is a value yielded by the
+    /// [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html) and where `T` is a tag that the user
+    /// has assigned to one of their [`Sink`s](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html). The returned
+    /// [`Future`](https://docs.rs/futures/0.3.4/futures/prelude/trait.Future.html) could be as simple as 
+    /// [`future::ready(tag)`](https://docs.rs/futures/0.3.4/futures/future/fn.ready.html) or a more complex `async` block
+    /// such as: 
+    /// ```
+    /// async move {
+    ///     let a = b.await;
+    ///     let c = a.await;
+    ///     c.await
+    /// }.boxed()
+    /// ```
+    pub fn add_source<S, M>(&mut self, stream: S, transform: M)
+    where
         S: Stream<Item = A> + Unpin + 'static,
         M: Fn(A) -> F + 'static,
         F: Future<Output = T>,
     {
         let tagger = tagger::StreamTagger::new(Box::new(transform));
-        self.streams.push(StreamManager::new(tagger, Box::new(stream)));
+        self.streams
+            .push(StreamManager::new(tagger, Box::new(stream)));
     }
 
+    /// Adds a new [`Sink`](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html) to the 
+    /// `StreamRouter` and provides the tag that will be used to identify the [`Sink`](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html)
+    /// from within the user-provided routing logic. Tags are intentionally as flexible as possible and 
+    /// only have a couple limitations: 
+    /// - All tags have to be the same base type
+    /// - Tags have to implement [`Hash`](https://doc.rust-lang.org/std/hash/trait.Hash.html)
+    /// - Tags have to implement [`Eq`](https://doc.rust-lang.org/std/cmp/trait.Eq.html)
+    /// - Tags have to implement [`Unpin`](https://doc.rust-lang.org/std/marker/trait.Unpin.html)
+    /// 
+    /// Luckily, most of the base types within the Rust std library implement all these. A non-exhaustive list of some built-in types
+    /// that can be used: 
+    /// - Numerics (`bool`, `u8`, `u16`, `usize`, etc.)
+    /// - `Ipv4Addr`/`Ipv6Addr`
+    /// - `String`/`&'static str`
+    /// 
+    /// But there is also no reason a custom type couldn't be used as long as it meets the above requirements! 
+    /// For example, the following could be used: 
+    /// ```
+    /// #[derive(Hash, Eq)]
+    /// enum Color {
+    ///     Red,
+    ///     Green,
+    ///     Blue, 
+    /// }
+    /// ```
     pub fn add_sink<S>(&mut self, sink: S, tag: T)
-    where 
+    where
         S: Sink<A> + Unpin + Sized + 'static,
     {
-        self.sinks.insert(tag, (0, Box::new(sink.sink_map_err(|_| ()))));
+        self.sinks
+            .insert(tag, (0, Box::new(sink.sink_map_err(|_| ()))));
     }
 }
 
@@ -145,7 +260,8 @@ where
                         let tag = self.streams[idx].pending_sink_tag.take().unwrap();
                         if let Some((ref_count, sink)) = self.sinks.get_mut(&tag) {
                             if *ref_count != 0 {
-                                // Someone else already got the sink open, so we don't have to!
+                                // Another stream is actively sending to this sink
+                                // so we can just immedietly start sinking
                                 self.streams[idx].pending_sink_tag = Some(tag);
                                 self.streams[idx].state = StreamState::SinkActive;
                                 *ref_count += 1;
@@ -171,7 +287,8 @@ where
                                 }
                             }
                         } else {
-                            // The sink we want is gone...
+                            // The sink we were going to send to is no longer active
+                            // so we will drop the value
                             self.streams[idx].state = StreamState::StreamActive;
                             break 'innerLoop;
                         }
@@ -239,6 +356,7 @@ where
     }
 }
 
+#[must_use = "streams do nothing unless you `.await` or poll them"]
 impl<F, T, A> Stream for StreamRouter<F, T, A>
 where
     F: Future<Output = T> + Unpin,

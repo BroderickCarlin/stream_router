@@ -4,14 +4,16 @@ version = "0.1.0"
 authors = ["Broderick Carlin <broderick.carlin@gmail.com>"]
 edition = "2018"
 license = "Apache-2.0"
-license-file = "LICENSE"
+readme = "README.md"
+repository = "https://github.com/BroderickCarlin/stream_router"
 description = "A Future aware router to dynamically route between Streams and Sinks"
+documentation = "https://docs.rs/stream_router/0.1.0/stream_router/"
+keywords = ["async", "futures", "tokio", "stream"]
+categories = ["asynchronous", "rust-patterns"]
 
 [dependencies]
 futures = "0.3"
 
 [dev-dependencies]
 tokio = {version = "0.2", features = ["full"]}
-futures = {version = "0.3", features = ["compat"]}
 num_stream = "0.1"
-qutex = "0.2"
