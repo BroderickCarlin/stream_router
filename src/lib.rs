@@ -75,9 +75,8 @@ impl<F, A, T> StreamManager<F, A, T> {
 /// to explicitly consume odd values if desired, in which case the `StreamRouter` would never yield any values itself.
 ///
 ///
-/// ```
+/// ```should_panic
 /// use futures::{channel::mpsc, future, stream, stream::StreamExt};
-/// use stream_router;
 /// use tokio;
 ///
 /// #[tokio::main]
@@ -149,7 +148,7 @@ where
     /// [`Future`](https://docs.rs/futures/0.3.4/futures/prelude/trait.Future.html) could be as simple as
     /// [`future::ready(tag)`](https://docs.rs/futures/0.3.4/futures/future/fn.ready.html) or a more complex `async` block
     /// such as:
-    /// ```
+    /// ```ignore
     /// async move {
     ///     let a = b.await;
     ///     let c = a.await;
@@ -185,7 +184,7 @@ where
     /// But there is also no reason a custom type couldn't be used as long as it meets the above requirements!
     /// For example, the following could be used:
     /// ```
-    /// #[derive(Hash, Eq)]
+    /// #[derive(Hash, Eq, PartialEq)]
     /// enum Color {
     ///     Red,
     ///     Green,
