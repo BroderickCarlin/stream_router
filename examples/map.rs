@@ -16,11 +16,6 @@ async fn main() {
     // even number: 4
     // odd number:  6
     // ...
-    //
-    // NOTE: StreamRouter here guarantees that the `even number` logs will always be in
-    //       sequential order and it guarantees that the `odd number` logs will always be
-    //       in sequential order. StreamRouter does NOT guarantee that when these 2 logs are
-    //       interwoven (as done here) that they will jointly be in sequential order.
     loop {
         tokio::select! {
             v = router.next() => {
