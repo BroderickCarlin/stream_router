@@ -109,8 +109,8 @@ impl<F, A, T> StreamManager<F, A, T> {
 /// `Fn(A) -> Future<Output = (A, T)>` where `A` is a value yielded by the [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html)
 /// and where `T` is a tag that the user has assigned to one of their [`Sink`s](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html).
 /// It should be noted that the closure takes ownership of the values yielded by the stream and is responsible for also
-/// returning the values as part of the tuple that contains the  [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html) tag. 
-/// This is done to avoid the need to `clone()` each value but also allows the user to potentially "map" the values if 
+/// returning the values as part of the tuple that contains the  [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html) tag.
+/// This is done to avoid the need to `clone()` each value but also allows the user to potentially "map" the values if
 /// beneficial to their specific use-case. While simple routing (such as shown above) has no real need to utilize the flexibility provided by returning a
 /// [`Future`](https://docs.rs/futures/0.3.4/futures/prelude/trait.Future.html), the option to return a
 /// [`Future`](https://docs.rs/futures/0.3.4/futures/prelude/trait.Future.html) allows for more complex state-ful routing.

@@ -39,17 +39,13 @@ where
 
         match map_fut {
             None => Poll::Pending,
-            Some(mut fut) => {
-                match Pin::new(&mut fut).poll(cx) {
-                    Poll::Pending => {
-                        this.map_fut = Some(fut);
-                        Poll::Pending
-                    }
-                    Poll::Ready(val) => {
-                        Poll::Ready(val)
-                    }
+            Some(mut fut) => match Pin::new(&mut fut).poll(cx) {
+                Poll::Pending => {
+                    this.map_fut = Some(fut);
+                    Poll::Pending
                 }
-            }
+                Poll::Ready(val) => Poll::Ready(val),
+            },
         }
     }
 }
