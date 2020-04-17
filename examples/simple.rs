@@ -9,7 +9,7 @@ async fn main() {
     let nums = stream::iter(0..1_000);
     let (even_chan_tx, mut even_chan_rx) = mpsc::channel(10);
 
-    router.add_source(nums, |x| future::lazy(move |_| x % 2 == 0));
+    router.add_source(nums, |x| future::lazy(move |_| (x, x % 2 == 0)));
     router.add_sink(even_chan_tx, true);
 
     // Expected Output:

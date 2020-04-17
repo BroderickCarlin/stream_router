@@ -86,7 +86,7 @@ impl<F, A, T> StreamManager<F, A, T> {
 ///     let nums = stream::iter(0..1_000);
 ///     let (even_chan_tx, mut even_chan_rx) = mpsc::channel(10);
 ///
-///     router.add_source(nums, |x| future::lazy(move |_| x % 2 == 0));
+///     router.add_source(nums, |x| future::lazy(move |_| (x, x % 2 == 0)));
 ///     router.add_sink(even_chan_tx, true);
 ///
 ///     loop {
@@ -107,9 +107,12 @@ impl<F, A, T> StreamManager<F, A, T> {
 /// The `StreamRouter`'s routing logic is provided by the user in the form of closures that can map values yielded by
 /// a specific [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html) into tags that identify
 /// specific [`Sink`s](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html). These closures follow the form of
-/// `Fn(A) -> Future<Output=T>` where `A` is a value yielded by the [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html)
+/// `Fn(A) -> Future<Output = (A, T)>` where `A` is a value yielded by the [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html)
 /// and where `T` is a tag that the user has assigned to one of their [`Sink`s](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html).
-/// While simple routing (such as shown above) has no real need to utilize the flexibility provided by returning a
+/// It should be noted that the closure takes ownership of the values yielded by the stream and is responsible for also
+/// returning the values as part of the tuple that contains the  [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html) tag. 
+/// This is done to avoid the need to `clone()` each value but also allows the user to potentially "map" the values if 
+/// beneficial to their specific use-case. While simple routing (such as shown above) has no real need to utilize the flexibility provided by returning a
 /// [`Future`](https://docs.rs/futures/0.3.4/futures/prelude/trait.Future.html), the option to return a
 /// [`Future`](https://docs.rs/futures/0.3.4/futures/prelude/trait.Future.html) allows for more complex state-ful routing.
 /// An example of utilizing state-ful routing to dedup an incoming [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html)
@@ -140,7 +143,7 @@ where
     /// This tag will determine which [`Sink`](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html), if any, the
     /// value will be forwarded to.
     ///
-    /// The routing function follows the form: `Fn(A) -> Future<Output=T>` where `A` is a value yielded by the
+    /// The routing function follows the form: `Fn(A) -> Future<Output = (A, T)>` where `A` is a value yielded by the
     /// [`Stream`](https://docs.rs/futures/0.3.4/futures/stream/trait.Stream.html) and where `T` is a tag that the user
     /// has assigned to one of their [`Sink`s](https://docs.rs/futures/0.3.4/futures/sink/trait.Sink.html). The returned
     /// [`Future`](https://docs.rs/futures/0.3.4/futures/prelude/trait.Future.html) could be as simple as
@@ -157,7 +160,7 @@ where
     where
         S: Stream<Item = A> + Unpin + 'static,
         M: Fn(A) -> F + 'static,
-        F: Future<Output = T>,
+        F: Future<Output = (A, T)>,
     {
         let tagger = tagger::StreamTagger::new(Box::new(transform));
         self.streams
@@ -200,9 +203,9 @@ where
 
 impl<F, T, A> StreamRouter<F, T, A>
 where
-    F: Future<Output = T> + Unpin,
+    F: Future<Output = (A, T)> + Unpin,
     T: Hash + Eq + Unpin,
-    A: Unpin + Clone,
+    A: Unpin,
 {
     fn poll_next_entry(&mut self, cx: &mut Context<'_>) -> Poll<Option<A>> {
         use Poll::*;
@@ -359,9 +362,9 @@ where
 #[must_use = "streams do nothing unless you `.await` or poll them"]
 impl<F, T, A> Stream for StreamRouter<F, T, A>
 where
-    F: Future<Output = T> + Unpin,
+    F: Future<Output = (A, T)> + Unpin,
     T: Hash + Eq + Unpin,
-    A: Unpin + Clone,
+    A: Unpin,
 {
     type Item = A;
 

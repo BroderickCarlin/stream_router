@@ -7,7 +7,7 @@ use tokio;
 #[tokio::main]
 async fn main() {
     let mut router = stream_router::StreamRouter::new();
-    router.add_source(stream::iter(0..100), |_| future::ready(()));
+    router.add_source(stream::iter(0..100), |x| future::ready((x, ())));
 
     // Expected Output:
     // 0

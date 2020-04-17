@@ -3,39 +3,35 @@ use std::hash::Hash;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-pub struct StreamTagger<F, V> {
-    map_func: Box<dyn Fn(V) -> F>,
-    map_val: Option<V>,
+pub struct StreamTagger<F, A> {
+    map_func: Box<dyn Fn(A) -> F>,
     map_fut: Option<F>,
 }
 
-impl<F, V> StreamTagger<F, V> {
-    pub fn new(map_func: Box<dyn Fn(V) -> F>) -> StreamTagger<F, V> {
+impl<F, A> StreamTagger<F, A> {
+    pub fn new(map_func: Box<dyn Fn(A) -> F>) -> StreamTagger<F, A> {
         StreamTagger {
             map_func,
-            map_val: None,
             map_fut: None,
         }
     }
 
-    pub fn start_map<T>(&mut self, val: V)
+    pub fn start_map<T>(&mut self, val: A)
     where
-        F: Future<Output = T>,
-        V: Clone,
+        F: Future<Output = (A, T)>,
         T: Hash,
     {
-        self.map_val = Some(val.clone());
         self.map_fut = Some((self.map_func)(val));
     }
 }
 
-impl<F, V, T> Future for StreamTagger<F, V>
+impl<F, A, T> Future for StreamTagger<F, A>
 where
-    F: Future<Output = T> + Unpin,
-    V: Unpin,
+    F: Future<Output = (A, T)> + Unpin,
+    A: Unpin,
     T: Hash,
 {
-    type Output = (V, T);
+    type Output = (A, T);
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         let this = self.get_mut();
@@ -49,10 +45,8 @@ where
                         this.map_fut = Some(fut);
                         Poll::Pending
                     }
-                    Poll::Ready(tag) => {
-                        // map_val here must ALWAYS be Some()
-                        let val = this.map_val.take().unwrap();
-                        Poll::Ready((val, tag))
+                    Poll::Ready(val) => {
+                        Poll::Ready(val)
                     }
                 }
             }

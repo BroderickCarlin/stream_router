@@ -14,7 +14,7 @@ async fn main() {
 
     let is_even = |x| {
         let retval = x % 2 == 0;
-        future::ready(retval)
+        future::ready((x, retval))
     };
 
     router.add_source(nums, is_even);

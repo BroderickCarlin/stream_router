@@ -22,7 +22,7 @@ async fn main() {
         output: true,
     }));
 
-    let is_enabled = move |_| {
+    let is_enabled = move |x| {
         let state = state.clone();
         async move {
             state
@@ -32,7 +32,7 @@ async fn main() {
                         state.output ^= true;
                     }
                     state.count += 1;
-                    state.output
+                    (x, state.output)
                 })
                 .await
         }

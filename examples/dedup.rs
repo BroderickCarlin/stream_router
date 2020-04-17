@@ -23,7 +23,7 @@ async fn main() {
                 .map(|mut state| {
                     let prev_val = state.val;
                     state.val = x;
-                    prev_val == x
+                    (x, prev_val == x)
                 })
                 .await
         }

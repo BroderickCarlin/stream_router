@@ -33,14 +33,14 @@ async fn main() {
         last_output: 0,
     }));
 
-    let fan = move |_| {
+    let fan = move |x| {
         let state = state.clone();
         async move {
             state
                 .lock()
                 .map(|mut state| {
                     state.last_output = (state.last_output + 1) % state.max_outputs;
-                    state.last_output
+                    (x, state.last_output)
                 })
                 .await
         }
