@@ -17,4 +17,9 @@ futures = "0.3"
 [dev-dependencies]
 tokio = {version = "0.2", features = ["full"]}
 num_stream = "0.1"
+criterion = "0.3"
 futures-test = "0.3"
+
+[[bench]]
+name = "benchmark"
+harness = false
